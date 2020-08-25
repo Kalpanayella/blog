@@ -1,0 +1,74 @@
+<sequence name="oauth-backend-flow"  xmlns="http://ws.apache.org/ns/synapse">
+         <property name="oauth_values" expression="get-property('registry','conf:/api_oauth_values.xml')" scope="default" type="OM"/>
+
+         <property name="grant_type" expression="$ctx:oauth_values//grant_type"/>
+         <property name="client_id" expression="$ctx:oauth_values//client_id"/>
+         <property name="client_secret" expression="$ctx:oauth_values//client_secret"/>         
+         <property name="resource" expression="$ctx:oauth_values//resource"/>
+         <property name="oauth_url" expression="$ctx:oauth_values//oauth_url"/>
+         <property name="uri.var.httpendpointurl" expression="$ctx:oauth_values//oauth_url"/>
+        <log level="custom">
+                    <property name="Inside oauth-backend-flow........................... :" expression="$axis2:REST_URL_POSTFIX"/>
+                     <property name="grant_type..................." expression="$ctx:grant_type"/>
+                     <property name="client_id..................." expression="$ctx:client_id"/>
+                     <property name="client_secret..................." expression="$ctx:client_secret"/>         
+                     <property name="resource..................." expression="$ctx:resource"/>
+                     <property name="uri.var.httpendpointurl..................." expression="$ctx:oauth_url"/>
+        </log>
+         <property name="message_body" expression="json-eval($)" scope="default" type="STRING"/>         
+         <property name="content_type" expression="$trp:Content-Type" scope="default" type="STRING"/>
+         <property name="resource_x" expression="$axis2:REST_URL_POSTFIX"/>
+
+         <payloadFactory media-type="xml">
+            <format>
+               <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+                  <soapenv:Body>
+                     <root xmlns="">
+                        <grant_type>$1</grant_type>
+                        <client_id>$2</client_id>
+                        <client_secret>$3</client_secret>
+                        <resource>$4</resource>
+                     </root>
+                  </soapenv:Body>
+               </soapenv:Envelope>
+            </format>
+            <args>
+               <arg evaluator="xml" expression="$ctx:grant_type"/>
+               <arg evaluator="xml" expression="$ctx:client_id"/>
+               <arg evaluator="xml" expression="$ctx:client_secret"/>
+               <arg evaluator="xml" expression="$ctx:resource"/>
+            </args>
+         </payloadFactory>
+
+         <property name="messageType" value="application/x-www-form-urlencoded" scope="axis2" type="STRING"/>
+         <property name="ContentType" value="application/x-www-form-urlencoded" scope="axis2" type="STRING"/>
+         <property name="DISABLE_CHUNKING" value="true" scope="axis2" type="STRING"/>
+         <property description="REST_URL_POSTFIx" name="REST_URL_POSTFIX" scope="axis2" type="STRING" value=""/>
+
+
+         <call blocking="true">
+            <endpoint name="token">
+               <http method="post" uri-template="{uri.var.httpendpointurl}"/>
+            </endpoint>
+         </call>
+         <property name="obtained_access_token" expression="json-eval($.access_token)" scope="default" type="STRING"/>
+
+         <log level="custom">
+               <property name="obtained_access_token..................." expression="$ctx:obtained_access_token"/>
+         </log>
+
+
+            <property name="REST_URL_POSTFIX" expression="$ctx:resource_x" scope="axis2" type="STRING"/>
+            <header name="Content-Type" expression="$ctx:content_type" scope="transport"/>
+            <header name="Authorization" expression="fn:concat('Bearer ', $ctx:obtained_access_token)" scope="transport"/>
+
+            <payloadFactory media-type="json">
+                <format>
+                    $1
+                </format>
+                <args>
+                    <arg evaluator="xml" expression="get-property('message_body')"/>
+                </args>
+            </payloadFactory>
+
+</sequence>
